@@ -2,10 +2,10 @@ package com.github.snake1byte.discord_cli_guild_client;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
-import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.MessageEmbed;
-import net.dv8tion.jda.api.entities.sticker.Sticker;
-import net.dv8tion.jda.api.events.message.*;
+import net.dv8tion.jda.api.events.message.MessageDeleteEvent;
+import net.dv8tion.jda.api.events.message.MessageEmbedEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.MessageUpdateEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveAllEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveEmojiEvent;
@@ -15,6 +15,8 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Test {
     private JDA jda;
@@ -37,42 +39,44 @@ public class Test {
         jda.addEventListener(listener);
     }
 
+    private Message createMessageObject(net.dv8tion.jda.api.entities.Message discordApiMessageObject) {
+        String nickname = null, channelCategoryId = null, channelCategoryName = null;
+        if (discordApiMessageObject.getMember() != null) {
+            nickname = discordApiMessageObject.getMember().getNickname();
+        }
+        if (discordApiMessageObject.getCategory() != null) {
+            channelCategoryId = discordApiMessageObject.getCategory().getId();
+            channelCategoryName = discordApiMessageObject.getCategory().getName();
+        }
+
+        Message repliedTo = null;
+        if (discordApiMessageObject.getMessageReference() != null && discordApiMessageObject.getMessageReference()
+                .getMessage() != null) {
+            repliedTo = createMessageObject(discordApiMessageObject.getMessageReference().getMessage());
+        }
+
+        String usedStickerName = null;
+        if (discordApiMessageObject.getStickers().size() > 0) {
+            usedStickerName = discordApiMessageObject.getStickers().get(0).getName();
+        }
+
+        List<Attachment> attachments = new ArrayList<>();
+        for (net.dv8tion.jda.api.entities.Message.Attachment attachment : discordApiMessageObject.getAttachments()) {
+            attachments.add(new Attachment(attachment.getFileName(), attachment.getSize(), attachment.isImage(), attachment.isVideo(), attachment.getProxyUrl()));
+        }
+
+        return new Message(discordApiMessageObject.getAuthor().getName(), discordApiMessageObject.getAuthor()
+                .getDiscriminator(), nickname, discordApiMessageObject.getGuild()
+                .getId(), discordApiMessageObject.getGuild().getName(), discordApiMessageObject.getChannel()
+                .getId(), discordApiMessageObject.getChannel()
+                .getName(), channelCategoryId, channelCategoryName, discordApiMessageObject.getContentDisplay(), discordApiMessageObject.getTimeCreated(), repliedTo, usedStickerName, attachments);
+    }
+
     ListenerAdapter listener = new ListenerAdapter() {
         @Override
         public void onMessageReceived(MessageReceivedEvent event) {
-            System.out.println("onMessageReceived");
-            System.out.println(event.getAuthor().getDiscriminator());
-            System.out.println(event.getAuthor().getName());
-            System.out.println(event.getChannel().getName());
-            System.out.println(event.getChannelType());
-            System.out.println(event.getGuild().getName());
-            System.out.println(event.getMember().getNickname());
-            event.getMessage().getAttachments().forEach(e -> System.out.println(e.getContentType()));
-            event.getMessage().getAttachments().forEach(e -> System.out.println(e.getDescription()));
-            event.getMessage().getAttachments().forEach(e -> System.out.println(e.getFileExtension()));
-            event.getMessage().getAttachments().forEach(e -> System.out.println(e.getFileName()));
-            event.getMessage().getAttachments().forEach(e -> System.out.println(e.getHeight()));
-            event.getMessage().getAttachments().forEach(e -> System.out.println(e.getSize()));
-            event.getMessage().getAttachments().forEach(e -> System.out.println(e.getWidth()));
-            event.getMessage().getAttachments().forEach(e -> System.out.println(e.isImage()));
-            event.getMessage().getAttachments().forEach(e -> System.out.println(e.isVideo()));
-            System.out.println(event.getMessage().getCategory().getName());
-            System.out.println(event.getMessage().getContentDisplay());
-            event.getMessage().getEmbeds().forEach(e -> System.out.println(e.getDescription()));
-            event.getMessage().getEmbeds().forEach(e -> System.out.println(e.getSiteProvider().getName()));
-            event.getMessage().getEmbeds().forEach(e -> System.out.println(e.getLength()));
-            event.getMessage().getEmbeds().forEach(e -> System.out.println(e.getTimestamp()));
-            event.getMessage().getEmbeds().forEach(e -> System.out.println(e.getTitle()));
-            event.getMessage().getEmbeds().forEach(e -> System.out.println(e.getType()));
-            event.getMessage().getEmbeds().forEach(e -> System.out.println(e.getVideoInfo()));
-            if (event.getMessage().getMessageReference() != null && event.getMessage().getMessageReference()
-                    .getMessage() != null) {
-                System.out.println(event.getMessage().getMessageReference().getMessage().getContentDisplay());
-            }
-            event.getMessage().getStickers().forEach(e -> System.out.println(e.getName()));
-            System.out.println(event.getMessage().getTimeCreated());
-            System.out.println(event.getMessage().getType().name());
-            System.out.println("\n\n");
+            Message message = createMessageObject(event.getMessage());
+            System.out.println();
         }
 
         @Override
