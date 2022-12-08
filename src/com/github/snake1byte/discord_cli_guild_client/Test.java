@@ -2,24 +2,25 @@ package com.github.snake1byte.discord_cli_guild_client;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.events.message.MessageDeleteEvent;
-import net.dv8tion.jda.api.events.message.MessageEmbedEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.MessageUpdateEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveAllEvent;
-import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveEmojiEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveEvent;
-import net.dv8tion.jda.api.events.user.UserTypingEvent;
+import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class Test {
     private JDA jda;
+    private List<net.dv8tion.jda.api.entities.Message> cache = new ArrayList<>();
+    private Map<Long, List<String>> changeHistory = new HashMap<>();
 
     public static void main(String[] args) {
         new Test();
@@ -33,25 +34,14 @@ public class Test {
             // TODO log
             System.exit(1);
         }
-        jda = JDABuilder.createDefault(token)
-                .enableIntents(GatewayIntent.GUILD_MESSAGE_REACTIONS, GatewayIntent.GUILD_MESSAGE_TYPING, GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_VOICE_STATES, GatewayIntent.MESSAGE_CONTENT)
-                .build();
+        jda = JDABuilder.createDefault(token).enableIntents(GatewayIntent.GUILD_MESSAGE_REACTIONS, GatewayIntent.GUILD_MESSAGE_TYPING, GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_VOICE_STATES, GatewayIntent.MESSAGE_CONTENT).build();
         jda.addEventListener(listener);
     }
 
+    @Nullable
     private Message createMessageObject(net.dv8tion.jda.api.entities.Message discordApiMessageObject) {
-        String nickname = null, channelCategoryId = null, channelCategoryName = null;
-        if (discordApiMessageObject.getMember() != null) {
-            nickname = discordApiMessageObject.getMember().getNickname();
-        }
-        if (discordApiMessageObject.getCategory() != null) {
-            channelCategoryId = discordApiMessageObject.getCategory().getId();
-            channelCategoryName = discordApiMessageObject.getCategory().getName();
-        }
-
         Message repliedTo = null;
-        if (discordApiMessageObject.getMessageReference() != null && discordApiMessageObject.getMessageReference()
-                .getMessage() != null) {
+        if (discordApiMessageObject.getMessageReference() != null && discordApiMessageObject.getMessageReference().getMessage() != null) {
             repliedTo = createMessageObject(discordApiMessageObject.getMessageReference().getMessage());
         }
 
@@ -60,44 +50,80 @@ public class Test {
             usedStickerName = discordApiMessageObject.getStickers().get(0).getName();
         }
 
-        List<Attachment> attachments = new ArrayList<>();
+        List<Attachment> attachments = null;
+        if (discordApiMessageObject.getAttachments().size() > 0) {
+            attachments = new ArrayList<>();
+        }
         for (net.dv8tion.jda.api.entities.Message.Attachment attachment : discordApiMessageObject.getAttachments()) {
             attachments.add(new Attachment(attachment.getFileName(), attachment.getSize(), attachment.isImage(), attachment.isVideo(), attachment.getProxyUrl()));
         }
 
-        return new Message(discordApiMessageObject.getAuthor().getName(), discordApiMessageObject.getAuthor()
-                .getDiscriminator(), nickname, discordApiMessageObject.getGuild()
-                .getId(), discordApiMessageObject.getGuild().getName(), discordApiMessageObject.getChannel()
-                .getId(), discordApiMessageObject.getChannel()
-                .getName(), channelCategoryId, channelCategoryName, discordApiMessageObject.getContentDisplay(), discordApiMessageObject.getTimeCreated(), repliedTo, usedStickerName, attachments);
+        if (discordApiMessageObject.getChannelType() == ChannelType.PRIVATE) {
+            return new Message(discordApiMessageObject.getAuthor().getName(), discordApiMessageObject.getAuthor().getDiscriminator(), discordApiMessageObject.getContentDisplay(), discordApiMessageObject.getTimeCreated(), repliedTo, attachments, usedStickerName);
+        } else if (discordApiMessageObject.getChannelType() == ChannelType.TEXT) {
+            String nickname = null, channelCategoryId = null, channelCategoryName = null;
+            if (discordApiMessageObject.getMember() != null) {
+                nickname = discordApiMessageObject.getMember().getNickname();
+            }
+            if (discordApiMessageObject.getCategory() != null) {
+                channelCategoryId = discordApiMessageObject.getCategory().getId();
+                channelCategoryName = discordApiMessageObject.getCategory().getName();
+            }
+            return new GuildMessage(discordApiMessageObject.getAuthor().getName(), discordApiMessageObject.getAuthor().getDiscriminator(), discordApiMessageObject.getContentDisplay(), discordApiMessageObject.getTimeCreated(), repliedTo, attachments, usedStickerName, discordApiMessageObject.getGuild().getId(), discordApiMessageObject.getGuild().getName(), discordApiMessageObject.getMember().getNickname(), discordApiMessageObject.getChannel().getId(), discordApiMessageObject.getChannel().getName(), channelCategoryId, channelCategoryName);
+        } else {
+            System.out.printf("Received a message in channel type %s.%n", discordApiMessageObject.getChannelType());
+            if (!discordApiMessageObject.getContentDisplay().isBlank()) {
+                System.out.printf("Content of the message was \"%s\".%n", discordApiMessageObject.getContentDisplay());
+            }
+            // TODO log that a message of type ChannelType has been received for now
+            return null;
+        }
     }
 
     ListenerAdapter listener = new ListenerAdapter() {
         @Override
+        public void onReady(ReadyEvent event) {
+            System.out.println("Ready.\n");
+        }
+
+        @Override
         public void onMessageReceived(MessageReceivedEvent event) {
             Message message = createMessageObject(event.getMessage());
-            System.out.println();
+            cache.add(event.getMessage());
+            System.out.println(message);
         }
 
         @Override
         public void onMessageUpdate(MessageUpdateEvent event) {
-            System.out.println("onMessageUpdate");
+            Message message = createMessageObject(event.getMessage());
+            Optional<net.dv8tion.jda.api.entities.Message> updatedMessageOpt = cache.stream().filter(e -> e.getIdLong() == event.getMessageIdLong()).findFirst();
+            if (updatedMessageOpt.isEmpty()) {
+                System.out.printf("Message updated:%n%s%n", createMessageObject(event.getMessage()));
+            } else {
+                System.out.printf(""); //TODO toString() methods of Message (with header, body...)
+
+            }
         }
 
         @Override
         public void onMessageDelete(MessageDeleteEvent event) {
-            System.out.println("onMessageDelete");
+            Optional<net.dv8tion.jda.api.entities.Message> deletedMessageOpt = cache.stream().filter(e -> e.getIdLong() == event.getMessageIdLong()).findFirst();
+            if (deletedMessageOpt.isEmpty()) {
+                System.out.printf("Message with ID %d was deleted.%n", event.getMessageIdLong());
+            } else {
+                System.out.printf("Message deleted:%n%s%n", createMessageObject(deletedMessageOpt.get()));
+            }
         }
 
-        @Override
-        public void onMessageEmbed(MessageEmbedEvent event) {
-            System.out.println("onMessageEmbed");
-        }
+//        @Override
+//        public void onMessageEmbed(MessageEmbedEvent event) {
+//            System.out.println("onMessageEmbed");
+//        }
 
-        @Override
-        public void onUserTyping(UserTypingEvent event) {
-            System.out.println("onUserTyping");
-        }
+//        @Override
+//        public void onUserTyping(UserTypingEvent event) {
+//            System.out.println("onUserTyping");
+//        }
 
         @Override
         public void onMessageReactionAdd(MessageReactionAddEvent event) {
@@ -114,9 +140,9 @@ public class Test {
             System.out.println("onMessageReactionRemoveAll");
         }
 
-        @Override
-        public void onMessageReactionRemoveEmoji(MessageReactionRemoveEmojiEvent event) {
-            System.out.println("onMessageReactionRemoveEmoji");
-        }
+//        @Override
+//        public void onMessageReactionRemoveEmoji(MessageReactionRemoveEmojiEvent event) {
+//            System.out.println("onMessageReactionRemoveEmoji");
+//        }
     };
 }
