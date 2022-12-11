@@ -12,6 +12,7 @@ import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -81,7 +82,7 @@ public class Test {
 
     ListenerAdapter listener = new ListenerAdapter() {
         @Override
-        public void onReady(ReadyEvent event) {
+        public void onReady(@NotNull ReadyEvent event) {
             System.out.println("Ready.\n");
         }
 
@@ -89,7 +90,9 @@ public class Test {
         public void onMessageReceived(MessageReceivedEvent event) {
             Message message = createMessageObject(event.getMessage());
             cache.add(event.getMessage());
-            System.out.println(message);
+            if (message != null) {
+                System.out.println(message.toMessageReceivedString());
+            }
         }
 
         @Override
@@ -100,7 +103,7 @@ public class Test {
                 cache.add(event.getMessage());
                 System.out.printf("Message updated:%n%s%n", message);
             } else {
-                System.out.printf(""); //TODO toString() methods of Message (with header, body...)
+                // System.out.printf(""); //TODO toString() methods of Message (with header, body...)
                 List<String> messageHistoryOfId = changeHistory.computeIfAbsent(updatedMessageOpt.get().getIdLong(), k -> {
                     List<String> messageHistory = new ArrayList<>();
                     messageHistory.add(updatedMessageOpt.get().getContentDisplay());
@@ -111,7 +114,7 @@ public class Test {
         }
 
         @Override
-        public void onMessageDelete(MessageDeleteEvent event) {
+        public void onMessageDelete(@NotNull MessageDeleteEvent event) {
             Optional<net.dv8tion.jda.api.entities.Message> deletedMessageOpt = cache.stream().filter(e -> e.getIdLong() == event.getMessageIdLong()).findFirst();
             if (deletedMessageOpt.isEmpty()) {
                 System.out.printf("Message with ID %d was deleted.%n", event.getMessageIdLong());
@@ -121,23 +124,18 @@ public class Test {
         }
 
         @Override
-        public void onMessageReactionAdd(MessageReactionAddEvent event) {
+        public void onMessageReactionAdd(@NotNull MessageReactionAddEvent event) {
             System.out.println("onMessageReactionAdd");
         }
 
         @Override
-        public void onMessageReactionRemove(MessageReactionRemoveEvent event) {
+        public void onMessageReactionRemove(@NotNull MessageReactionRemoveEvent event) {
             System.out.println("onMessageReactionRemove");
         }
 
         @Override
-        public void onMessageReactionRemoveAll(MessageReactionRemoveAllEvent event) {
+        public void onMessageReactionRemoveAll(@NotNull MessageReactionRemoveAllEvent event) {
             System.out.println("onMessageReactionRemoveAll");
         }
-
-//        @Override
-//        public void onMessageReactionRemoveEmoji(MessageReactionRemoveEmojiEvent event) {
-//            System.out.println("onMessageReactionRemoveEmoji");
-//        }
     };
 }
