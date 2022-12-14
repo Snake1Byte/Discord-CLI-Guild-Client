@@ -1,5 +1,7 @@
 package com.github.snake1byte.discord_cli_guild_client;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.OffsetDateTime;
@@ -18,8 +20,9 @@ public class GuildMessage extends Message {
     @Nullable
     private String channelCategoryName;
 
-    public GuildMessage(String author, String discriminator, String message, OffsetDateTime timestamp, @Nullable Message repliedTo, @Nullable List<Attachment> attachments, @Nullable String usedStickerName, @Nullable String guildId, String guildName, @Nullable String nickname, String channelId, String channelName, @Nullable String channelCategoryId, @Nullable String channelCategoryName) {
-        super(author, discriminator, message, timestamp, repliedTo, attachments, usedStickerName);
+    public GuildMessage(@JsonProperty("id") long id, @JsonProperty("author") String author, @JsonProperty("discriminator") String discriminator, @JsonProperty("message") String message, @JsonProperty("timestamp") OffsetDateTime timestamp, @JsonProperty("repliedTo") @Nullable Message repliedTo, @JsonProperty("attachments") @Nullable List<Attachment> attachments, @JsonProperty("usedStickerName") @Nullable String usedStickerName, @JsonProperty("guildId") @Nullable String guildId, @JsonProperty("guildName") String guildName, @JsonProperty("nickname") @Nullable String nickname, @JsonProperty("channelId") String channelId, @JsonProperty("channelName") String channelName, @JsonProperty("channelCategoryId") @Nullable String channelCategoryId, @JsonProperty("channelCategoryName") @Nullable String channelCategoryName) {
+        //    public GuildMessage(long id, String author, String discriminator, String message, OffsetDateTime timestamp, @Nullable Message repliedTo, @Nullable List<Attachment> attachments, @Nullable String usedStickerName, @Nullable String guildId, String guildName, @Nullable String nickname, String channelId, String channelName, @Nullable String channelCategoryId, @Nullable String channelCategoryName) {
+        super(id, author, discriminator, message, timestamp, repliedTo, attachments, usedStickerName);
         this.guildId = guildId;
         this.nickname = nickname;
         this.guildName = guildName;
@@ -67,9 +70,8 @@ public class GuildMessage extends Message {
     }
 
     @Override
-    public String toMessageReceivedString() {
+    protected String headerToString() {
         StringBuilder builder = new StringBuilder();
-        // header
         String timeOfDay = timestamp.format(DateTimeFormatter.ISO_LOCAL_TIME);
         builder.append(guildName).append(" in #").append(channelName).append(":\n");
         if (nickname != null) {
@@ -77,106 +79,24 @@ public class GuildMessage extends Message {
         } else {
             builder.append(author).append("#").append(discriminator).append(" at ").append(timeOfDay).append(":");
         }
-        // body
-        if (!message.isBlank()) {
-            builder.append("\n").append(message);
-        }
-        if (usedStickerName != null) {
-            if (message.isBlank()) {
-                builder.append("\n");
-            }
-            builder.append(" ++").append(usedStickerName).append("++\n");
-        } else {
-            builder.append("\n");
-        }
-        if (attachments != null && !attachments.isEmpty()) {
-            if (attachments.size() > 1) {
-                builder.append(attachments.size()).append(" attachments: ");
-                int images = 0, videos = 0;
-                for (Attachment attachment : attachments) {
-                    if (attachment.isImage()) {
-                        ++images;
-                    } else if (attachment.isVideo()) {
-                        ++videos;
-                    }
-                }
-                if (images > 0) {
-                    if (images > 1) {
-                        builder.append(images).append(" images");
-                    } else {
-                        builder.append(images).append(" image");
-                    }
-                }
-                if (videos > 0) {
-                    if (images > 0) {
-                        builder.append(", ");
-                    }
-                    if (videos > 1) {
-                        builder.append(videos).append(" videos");
-                    } else {
-                        builder.append(videos).append(" video");
-                    }
-                }
-                int other = attachments.size() - videos - images;
-                if (other > 0) {
-                    if (images > 0 || videos > 0) {
-                        builder.append(", ");
-                    }
-                    if (other > 1) {
-                        builder.append("others");
-                    } else {
-                        builder.append("other");
-                    }
-                }
-                builder.append("\n");
-                for (int i = 0; i < attachments.size(); ++i) {
-                    builder.append(i + 1).append(": ").append(attachments.get(i).fileName()).append(", ")
-                            .append(attachments.get(i).size()).append(", ").append(attachments.get(i).downloadURL())
-                            .append("\n");
-                }
-            } else {
-                Attachment attachment = attachments.get(0);
-                if (attachment.isImage()) {
-                    builder.append("Image attached, ").append(attachment.fileName()).append(", ")
-                            .append(attachment.size()).append(", ").append(attachment.downloadURL());
-                } else if (attachment.isVideo()) {
-                    builder.append("Video attached, ").append(attachment.fileName()).append(", ")
-                            .append(attachment.size()).append(", ").append(attachment.downloadURL());
-                } else {
-                    builder.append(attachment.fileName()).append(", ").append(attachment.size()).append(", ")
-                            .append(attachment.downloadURL());
-                }
-            }
-            if (repliedTo != null) {
-                if (nickname != null) {
-                    builder.append("\n").append("replied to \"").append(repliedTo.getMessage()).append("\"")
-                            .append(" by ").append(nickname);
-                } else {
-                    builder.append("\n").append("replied to \"").append(repliedTo.getMessage()).append("\"")
-                            .append(" by ").append(author).append("#").append(discriminator);
-                }
-            }
-        }
+        builder.append('\n');
+
         return builder.toString();
     }
 
     @Override
-    public String toMessageEditedString(@Nullable Message original) {
-        return null;
-    }
+    protected String replyToString() {
+        StringBuilder builder = new StringBuilder();
+        if (repliedTo != null) {
+            if (nickname != null) {
+                builder.append("replied to \"").append(repliedTo.getMessage()).append("\"").append(" by ")
+                        .append(nickname).append("\n");
+            } else {
+                builder.append("replied to \"").append(repliedTo.getMessage()).append("\"").append(" by ")
+                        .append(author).append("#").append(discriminator).append("\n");
+            }
+        }
 
-    @Override
-    public String toMessageDeletedString(@Nullable Message restored) {
-        return null;
-    }
-
-    @Override
-    public String headerToString() {
-        return null;
-    }
-
-    @Override
-    public String attachmentsToString() {
-        return null;
+        return builder.toString();
     }
 }

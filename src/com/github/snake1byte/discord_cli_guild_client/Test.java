@@ -20,14 +20,20 @@ import java.util.*;
 
 public class Test {
     private JDA jda;
-    private List<net.dv8tion.jda.api.entities.Message> cache = new ArrayList<>();
-    private Map<Long, List<String>> changeHistory = new HashMap<>();
+    private List<Message> cache;
+    private Map<Long, List<Message>> changeHistory = new HashMap<>();
 
     public static void main(String[] args) {
         new Test();
     }
 
     public Test() {
+//        try {
+//            cache = Persistence.loadCache();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+        cache = new ArrayList<>();
         String token = null;
         try {
             token = new Constants().getToken();
@@ -35,15 +41,21 @@ public class Test {
             // TODO log
             System.exit(1);
         }
-        jda = JDABuilder.createDefault(token).enableIntents(GatewayIntent.GUILD_MESSAGE_REACTIONS, GatewayIntent.GUILD_MESSAGE_TYPING, GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_VOICE_STATES, GatewayIntent.MESSAGE_CONTENT).build();
+        jda = JDABuilder.createDefault(token)
+                .enableIntents(GatewayIntent.GUILD_MESSAGE_REACTIONS, GatewayIntent.GUILD_MESSAGE_TYPING, GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_VOICE_STATES, GatewayIntent.MESSAGE_CONTENT)
+                .build();
         jda.addEventListener(listener);
     }
+
     @Nullable
     private Message createMessageObject(net.dv8tion.jda.api.entities.Message discordApiMessageObject) {
         Message repliedTo = null;
-        if (discordApiMessageObject.getMessageReference() != null && discordApiMessageObject.getMessageReference().getMessage() != null) {
+        if (discordApiMessageObject.getMessageReference() != null && discordApiMessageObject.getMessageReference()
+                .getMessage() != null) {
             repliedTo = createMessageObject(discordApiMessageObject.getMessageReference().getMessage());
         }
+
+        long id = discordApiMessageObject.getIdLong();
 
         String usedStickerName = null;
         if (discordApiMessageObject.getStickers().size() > 0) {
@@ -59,7 +71,8 @@ public class Test {
         }
 
         if (discordApiMessageObject.getChannelType() == ChannelType.PRIVATE) {      // DM
-            return new Message(discordApiMessageObject.getAuthor().getName(), discordApiMessageObject.getAuthor().getDiscriminator(), discordApiMessageObject.getContentDisplay(), discordApiMessageObject.getTimeCreated(), repliedTo, attachments, usedStickerName);
+            return new Message(id, discordApiMessageObject.getAuthor().getName(), discordApiMessageObject.getAuthor()
+                    .getDiscriminator(), discordApiMessageObject.getContentDisplay(), discordApiMessageObject.getTimeCreated(), repliedTo, attachments, usedStickerName);
         } else if (discordApiMessageObject.getChannelType() == ChannelType.TEXT) {  // Guild
             String nickname = null, channelCategoryId = null, channelCategoryName = null;
             if (discordApiMessageObject.getMember() != null) {
@@ -69,12 +82,16 @@ public class Test {
                 channelCategoryId = discordApiMessageObject.getCategory().getId();
                 channelCategoryName = discordApiMessageObject.getCategory().getName();
             }
-            return new GuildMessage(discordApiMessageObject.getAuthor().getName(), discordApiMessageObject.getAuthor().getDiscriminator(), discordApiMessageObject.getContentDisplay(), discordApiMessageObject.getTimeCreated(), repliedTo, attachments, usedStickerName, discordApiMessageObject.getGuild().getId(), discordApiMessageObject.getGuild().getName(), nickname, discordApiMessageObject.getChannel().getId(), discordApiMessageObject.getChannel().getName(), channelCategoryId, channelCategoryName);
+            return new GuildMessage(id, discordApiMessageObject.getAuthor()
+                    .getName(), discordApiMessageObject.getAuthor()
+                    .getDiscriminator(), discordApiMessageObject.getContentDisplay(), discordApiMessageObject.getTimeCreated(), repliedTo, attachments, usedStickerName, discordApiMessageObject.getGuild()
+                    .getId(), discordApiMessageObject.getGuild()
+                    .getName(), nickname, discordApiMessageObject.getChannel()
+                    .getId(), discordApiMessageObject.getChannel().getName(), channelCategoryId, channelCategoryName);
         } else {
-            // TODO log that a message of type ChannelType has been received for now
             System.out.printf("Received a message in channel type %s.%n", discordApiMessageObject.getChannelType());
             if (!discordApiMessageObject.getContentDisplay().isBlank()) {
-                System.out.printf("Content of the message was \"%s\".%n", discordApiMessageObject.getContentDisplay());
+                System.out.printf("%nContent of the message was \"%s\".%n%n", discordApiMessageObject.getContentDisplay());
             }
             return null;
         }
@@ -89,8 +106,14 @@ public class Test {
         @Override
         public void onMessageReceived(MessageReceivedEvent event) {
             Message message = createMessageObject(event.getMessage());
-            cache.add(event.getMessage());
             if (message != null) {
+                cache.add(message);
+                try {
+                    Persistence.saveCache(cache);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    // TODO log lmao
+                }
                 System.out.println(message.toMessageReceivedString());
             }
         }
@@ -98,44 +121,91 @@ public class Test {
         @Override
         public void onMessageUpdate(MessageUpdateEvent event) {
             Message message = createMessageObject(event.getMessage());
-            Optional<net.dv8tion.jda.api.entities.Message> updatedMessageOpt = cache.stream().filter(e -> e.getIdLong() == event.getMessageIdLong()).findFirst();
-            if (updatedMessageOpt.isEmpty()) {
-                cache.add(event.getMessage());
-                System.out.printf("Message updated:%n%s%n", message);
-            } else {
-                // System.out.printf(""); //TODO toString() methods of Message (with header, body...)
-                List<String> messageHistoryOfId = changeHistory.computeIfAbsent(updatedMessageOpt.get().getIdLong(), k -> {
-                    List<String> messageHistory = new ArrayList<>();
-                    messageHistory.add(updatedMessageOpt.get().getContentDisplay());
-                    return messageHistory;
-                });
-                messageHistoryOfId.add(event.getMessage().getContentDisplay());
+            if (message != null) {
+                Optional<Message> updatedMessageOpt = cache.stream().filter(e -> e.getId() == event.getMessageIdLong())
+                        .findFirst();
+                if (updatedMessageOpt.isEmpty()) {
+                    cache.add(message);
+                    System.out.println(message.toMessageEditedString(null));
+                } else {
+                    List<Message> messageHistoryOfId = changeHistory.computeIfAbsent(updatedMessageOpt.get()
+                            .getId(), k -> {
+                        List<Message> messageHistory = new ArrayList<>();
+                        messageHistory.add(updatedMessageOpt.get());
+                        return messageHistory;
+                    });
+                    messageHistoryOfId.add(message);
+                    System.out.println(message.toMessageEditedString(updatedMessageOpt.get()));
+                }
             }
         }
 
         @Override
         public void onMessageDelete(@NotNull MessageDeleteEvent event) {
-            Optional<net.dv8tion.jda.api.entities.Message> deletedMessageOpt = cache.stream().filter(e -> e.getIdLong() == event.getMessageIdLong()).findFirst();
+            Optional<Message> deletedMessageOpt = cache.stream().filter(e -> e.getId() == event.getMessageIdLong())
+                    .findFirst();
             if (deletedMessageOpt.isEmpty()) {
-                System.out.printf("Message with ID %d was deleted.%n", event.getMessageIdLong());
+                System.out.printf("Message with ID %d deleted.%n%n", event.getMessageIdLong());
             } else {
-                System.out.printf("Message deleted:%n%s%n", createMessageObject(deletedMessageOpt.get()));
+                System.out.println(Message.toMessageDeletedString(deletedMessageOpt.get()));
             }
         }
 
         @Override
         public void onMessageReactionAdd(@NotNull MessageReactionAddEvent event) {
-            System.out.println("onMessageReactionAdd");
+            Message message;
+            Optional<Message> messageOpt = cache.stream().filter(e -> e.getId() == event.getMessageIdLong())
+                    .findFirst();
+            if (messageOpt.isEmpty()) {
+                message = createMessageObject(event.retrieveMessage().complete());
+            } else {
+                message = messageOpt.get();
+            }
+            if (message != null) {
+                String username;
+                if (event.getMember() != null) {
+                    username = event.getMember().getNickname();
+                } else {
+                    if (event.getUser() != null) {
+                        username = event.getUser().getName() + "#" + event.getUser().getDiscriminator();
+                    } else {
+                        username = "<unknown user>";
+                    }
+                }
+                System.out.println(Message.toReactionAddedString(event.getReaction().getEmoji()
+                        .getName(), username, message));
+            }
         }
 
         @Override
         public void onMessageReactionRemove(@NotNull MessageReactionRemoveEvent event) {
-            System.out.println("onMessageReactionRemove");
+            Message message;
+            Optional<Message> messageOpt = cache.stream().filter(e -> e.getId() == event.getMessageIdLong())
+                    .findFirst();
+            if (messageOpt.isEmpty()) {
+                message = createMessageObject(event.retrieveMessage().complete());
+            } else {
+                message = messageOpt.get();
+            }
+            if (message != null) {
+                String username;
+                if (event.getMember() != null) {
+                    username = event.getMember().getNickname();
+                } else {
+                    if (event.getUser() != null) {
+                        username = event.getUser().getName() + "#" + event.getUser().getDiscriminator();
+                    } else {
+                        username = "<unknown user>";
+                    }
+                }
+                System.out.println(Message.toReactionRemovedString(event.getReaction().getEmoji()
+                        .getName(), username, message));
+            }
         }
 
         @Override
         public void onMessageReactionRemoveAll(@NotNull MessageReactionRemoveAllEvent event) {
-            System.out.println("onMessageReactionRemoveAll");
+            System.out.println("onMessageReactionRemoveAll\n");
         }
     };
 }
