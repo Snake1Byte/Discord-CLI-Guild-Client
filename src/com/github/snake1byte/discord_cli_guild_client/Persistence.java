@@ -54,7 +54,7 @@ public class Persistence {
     }
 
     /**
-     * Wrapper class needed to expose the types of the Messages the List is holding (either Guild or DM) to the jackson library, since the list is type-erased at runtime.
+     * Wrapper class needed to expose the types of the Messages the List is holding (either GuildMessage or Message) to the jackson library, since the list is type-erased at runtime.
      */
     private static class Wrapper {
         @JsonProperty

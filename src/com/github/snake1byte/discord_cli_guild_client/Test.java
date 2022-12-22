@@ -140,8 +140,9 @@ public class Test {
                         messageHistory.add(updatedMessageOpt.get());
                         return messageHistory;
                     });
+                    Message secondLatestMessageUpdate = messageHistoryOfId.get(messageHistoryOfId.size() - 1);
                     messageHistoryOfId.add(message);
-                    System.out.println(message.toMessageEditedString(updatedMessageOpt.get()));
+                    System.out.println(message.toMessageEditedString(secondLatestMessageUpdate));
                     Persistence.saveUpdateHistory(changeHistory);
                 }
             }
@@ -163,11 +164,12 @@ public class Test {
             Message message;
             Optional<Message> messageOpt = cache.stream().filter(e -> e.getId() == event.getMessageIdLong())
                     .findFirst();
-            if (messageOpt.isEmpty()) {
-                message = createMessageObject(event.retrieveMessage().complete());
-            } else {
-                message = messageOpt.get();
-            }
+            // save it in cache since the probability of multiple reactions at once being made is high
+            message = messageOpt.orElseGet(() -> {
+                Message reactedMessage = createMessageObject(event.retrieveMessage().complete());
+                cache.add(reactedMessage);
+                return reactedMessage;
+            });
             if (message != null) {
                 String username;
                 if (event.getMember() != null) {
@@ -189,11 +191,11 @@ public class Test {
             Message message;
             Optional<Message> messageOpt = cache.stream().filter(e -> e.getId() == event.getMessageIdLong())
                     .findFirst();
-            if (messageOpt.isEmpty()) {
-                message = createMessageObject(event.retrieveMessage().complete());
-            } else {
-                message = messageOpt.get();
-            }
+            message = messageOpt.orElseGet(() -> {
+                Message reactedMessage = createMessageObject(event.retrieveMessage().complete());
+                cache.add(reactedMessage);
+                return reactedMessage;
+            });
             if (message != null) {
                 String username;
                 if (event.getMember() != null) {
@@ -216,17 +218,17 @@ public class Test {
         }
     };
 
-//    private static void setup() {
-//        String rootFolder;
-//        String os = System.getProperty("os.name").toUpperCase();
-//        if (os.toLowerCase().contains("win")) {
-//            rootFolder = System.getenv("AppData");
-//        } else {
-//            rootFolder = System.getProperty("user.home");
-//            rootFolder += "/Library/Application Support";
-//        }
-//        rootFolder += "/Discord-CLI-Guild-Client";
-//        System.setProperty("programRoot", rootFolder);
-//    }
+    //    private static void setup() {
+    //        String rootFolder;
+    //        String os = System.getProperty("os.name").toUpperCase();
+    //        if (os.toLowerCase().contains("win")) {
+    //            rootFolder = System.getenv("AppData");
+    //        } else {
+    //            rootFolder = System.getProperty("user.home");
+    //            rootFolder += "/Library/Application Support";
+    //        }
+    //        rootFolder += "/Discord-CLI-Guild-Client";
+    //        System.setProperty("programRoot", rootFolder);
+    //    }
 
 }
