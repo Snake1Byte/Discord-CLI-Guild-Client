@@ -28,12 +28,12 @@ public class Test {
     }
 
     public Test() {
-//        try {
-//            cache = Persistence.loadCache();
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-        cache = new ArrayList<>();
+        try {
+            cache = Persistence.loadCache();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println(cache);
         String token = null;
         try {
             token = new Constants().getToken();
@@ -127,6 +127,12 @@ public class Test {
                 if (updatedMessageOpt.isEmpty()) {
                     cache.add(message);
                     System.out.println(message.toMessageEditedString(null));
+                    try {
+                        Persistence.saveCache(cache);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        // TODO log lmao
+                    }
                 } else {
                     List<Message> messageHistoryOfId = changeHistory.computeIfAbsent(updatedMessageOpt.get()
                             .getId(), k -> {
@@ -136,6 +142,7 @@ public class Test {
                     });
                     messageHistoryOfId.add(message);
                     System.out.println(message.toMessageEditedString(updatedMessageOpt.get()));
+                    Persistence.saveUpdateHistory(changeHistory);
                 }
             }
         }
@@ -208,4 +215,18 @@ public class Test {
             System.out.println("onMessageReactionRemoveAll\n");
         }
     };
+
+//    private static void setup() {
+//        String rootFolder;
+//        String os = System.getProperty("os.name").toUpperCase();
+//        if (os.toLowerCase().contains("win")) {
+//            rootFolder = System.getenv("AppData");
+//        } else {
+//            rootFolder = System.getProperty("user.home");
+//            rootFolder += "/Library/Application Support";
+//        }
+//        rootFolder += "/Discord-CLI-Guild-Client";
+//        System.setProperty("programRoot", rootFolder);
+//    }
+
 }

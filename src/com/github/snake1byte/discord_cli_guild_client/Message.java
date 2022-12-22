@@ -1,6 +1,5 @@
 package com.github.snake1byte.discord_cli_guild_client;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -12,8 +11,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type", visible = true)
-@JsonSubTypes(@JsonSubTypes.Type(value = GuildMessage.class, name = "guild"))
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
+@JsonSubTypes({@JsonSubTypes.Type(value = GuildMessage.class, name = "guild"), @JsonSubTypes.Type(value = Message.class, name = "dm")})
 public class Message {
     protected long id;
 
@@ -35,7 +34,6 @@ public class Message {
     protected String usedStickerName;
 
     public Message(@JsonProperty("id") long id, @JsonProperty("author") String author, @JsonProperty("discriminator") String discriminator, @JsonProperty("message") String message, @JsonProperty("timestamp") OffsetDateTime timestamp, @JsonProperty("repliedTo") @Nullable Message repliedTo, @JsonProperty("attachments") @Nullable List<Attachment> attachments, @JsonProperty("usedStickerName") @Nullable String usedStickerName) {
-        //    public Message(long id, String author, String discriminator, String message, OffsetDateTime timestamp, @Nullable Message repliedTo, @Nullable List<Attachment> attachments, @Nullable String usedStickerName) {
         this.id = id;
         this.author = author;
         this.discriminator = discriminator;
